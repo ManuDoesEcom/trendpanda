@@ -20,7 +20,7 @@ import { SaveButton } from "@/components/products/save-button"
 import { FinancialCalculator } from "@/components/products/financial-calculator"
 import { TrendChart } from "@/components/products/trend-chart"
 import { TikTokEmbed } from "@/components/products/tiktok-embed"
-import { DownloadVideoButton } from "@/components/products/download-video-button"
+import { DownloadMediaButton } from "@/components/products/download-media-button"
 import { AdCard } from "@/components/ads/ad-card"
 import { ProductCard } from "@/components/products/product-card"
 import { Badge } from "@/components/ui/badge"
@@ -110,13 +110,24 @@ export default async function ProductDetailPage({
             </div>
           )}
 
-          {product.downloadableVideoUrl && (
+          {product.downloadableVideoUrl ? (
             <div className="flex justify-end">
-              <DownloadVideoButton
-                videoUrl={product.downloadableVideoUrl}
+              <DownloadMediaButton
+                url={product.downloadableVideoUrl}
                 filename={`${product.slug}.mp4`}
+                kind="video"
               />
             </div>
+          ) : (
+            product.imageUrls[0] && (
+              <div className="flex justify-end">
+                <DownloadMediaButton
+                  url={product.imageUrls[0]}
+                  filename={`${product.slug}.jpg`}
+                  kind="image"
+                />
+              </div>
+            )
           )}
 
           <div>

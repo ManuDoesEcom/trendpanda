@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from "next/server"
  * cross-origin fetch() from the browser (CORS) or hotlinking (Referer
  * checks) — exactly what TikTok's and Meta's CDNs do.
  *
- * Only a fixed allowlist of hosts may be fetched here. Without this,
+ * Only an allowlisted set of hosts may be fetched here. Without this,
  * `url` would make this route an open server-side proxy an attacker could
  * use to reach internal/otherwise-unreachable addresses (SSRF).
  */
@@ -15,6 +15,14 @@ const ALLOWED_HOSTS = new Set([
   "www.w3schools.com",
   "download.samplelib.com",
 ])
+
+// Cover-image CDN hosts (thumbnail download fallback), matching the
+// next.config.ts image remotePatterns for the same domains.
+const ALLOWED_HOST_SUFFIXES = [".tiktokcdn-us.com", ".tiktokcdn-eu.com", ".tiktokcdn.com"]
+
+function isHostAllowed(hostname: string): boolean {
+  return ALLOWED_HOSTS.has(hostname) || ALLOWED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
+}
 
 export async function GET(request: NextRequest) {
   const sourceUrl = request.nextUrl.searchParams.get("url")
@@ -32,7 +40,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid URL." }, { status: 400 })
   }
 
-  if (parsed.protocol !== "https:" || !ALLOWED_HOSTS.has(parsed.hostname)) {
+  if (parsed.protocol !== "https:" || !isHostAllowed(parsed.hostname)) {
     return NextResponse.json({ error: "URL host is not allowed." }, { status: 403 })
   }
 

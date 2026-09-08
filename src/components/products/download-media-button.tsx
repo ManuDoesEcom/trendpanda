@@ -1,34 +1,38 @@
 "use client"
 
 import { useState, type MouseEvent } from "react"
-import { Download, Loader2 } from "lucide-react"
+import { Download, ImageDown, Loader2 } from "lucide-react"
 import { downloadFile } from "@/lib/utils/download-file"
 import { Button } from "@/components/ui/button"
 
 /**
- * Only ever rendered when `videoUrl` is a real, directly downloadable file
- * (see the `downloadableVideoUrl` comment on the Product type) — never
- * shown as a disabled placeholder for products with no real source.
+ * Downloads either a real video file (`kind: "video"`) or, when no real
+ * video exists for a product, its cover/thumbnail image (`kind: "image"`)
+ * as an honest fallback — the button and its label always reflect what's
+ * actually being downloaded, never claims a video when it's an image.
  */
-export function DownloadVideoButton({
-  videoUrl,
+export function DownloadMediaButton({
+  url,
   filename,
+  kind,
   variant = "outline",
   size = "sm",
 }: {
-  videoUrl: string
+  url: string
   filename: string
+  kind: "video" | "image"
   variant?: "outline" | "secondary" | "ghost"
   size?: "sm" | "default" | "icon"
 }) {
   const [isDownloading, setIsDownloading] = useState(false)
+  const label = kind === "video" ? "Download Video" : "Download Thumbnail"
 
   async function handleClick(event: MouseEvent) {
     event.preventDefault()
     event.stopPropagation()
     setIsDownloading(true)
     try {
-      await downloadFile(videoUrl, filename)
+      await downloadFile(url, filename)
     } finally {
       setIsDownloading(false)
     }
@@ -40,11 +44,17 @@ export function DownloadVideoButton({
       size={size}
       onClick={handleClick}
       disabled={isDownloading}
-      aria-label="Download video"
+      aria-label={label}
       className={size === "icon" ? undefined : "gap-1.5"}
     >
-      {isDownloading ? <Loader2 className="animate-spin" /> : <Download />}
-      {size !== "icon" && "Download Video"}
+      {isDownloading ? (
+        <Loader2 className="animate-spin" />
+      ) : kind === "video" ? (
+        <Download />
+      ) : (
+        <ImageDown />
+      )}
+      {size !== "icon" && label}
     </Button>
   )
 }

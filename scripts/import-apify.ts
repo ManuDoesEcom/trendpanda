@@ -14,6 +14,18 @@
  * with that title already exists, insert otherwise) rather than a DB-level
  * upsert.
  *
+ * Direct video downloads: the current scraper actor's dataset has no
+ * downloadable-video-file field at all (checked its full schema — only a
+ * cover-image URL). `resolveDownloadUrl()` below is pre-wired to pick up a
+ * real one (`videoMeta.downloadAddr`/`playAddr`, or a top-level
+ * `downloadUrl`/`videoUrl`/`playUrl`) the moment the Apify actor is swapped
+ * for a TikTok *downloader* actor that provides one — no other change to
+ * this script is needed. Two things still have to happen once that data
+ * exists: run `alter table public.products add column if not exists
+ * download_url text;` in Supabase, and update `mapProduct()` in
+ * lib/api/data-service.ts to select and pass through that column (it's not
+ * read there yet, since the column doesn't exist today).
+ *
  * Usage:
  *   npx tsx scripts/import-apify.ts
  *
@@ -38,6 +50,15 @@ interface ApifyHashtag {
 interface ApifyVideoMeta {
   coverUrl?: string
   originalCoverUrl?: string
+  // Not present in the current scraper actor's output (verified against
+  // its full dataset schema) — these are the field names most TikTok
+  // *downloader* actors use for a direct, playable/downloadable video
+  // file. Kept optional so this script does nothing today but picks them
+  // up automatically the moment a downloader actor is swapped in. Field
+  // names vary by actor; if the new actor uses a different key, add it
+  // here alongside the existing candidates.
+  downloadAddr?: string
+  playAddr?: string
 }
 
 interface ApifyTikTokItem {
@@ -51,6 +72,29 @@ interface ApifyTikTokItem {
   commentCount?: number
   hashtags?: ApifyHashtag[]
   createTimeISO?: string
+  // Top-level candidates some downloader actors use instead of nesting
+  // under videoMeta.
+  downloadUrl?: string
+  videoUrl?: string
+  playUrl?: string
+}
+
+/**
+ * Picks the first present direct video URL from whichever field name the
+ * configured actor happens to use. Returns null for the current scraper
+ * actor (none of these fields exist in its output) — `products.download_url`
+ * is only written when this resolves to a real value AND that column has
+ * been added to Supabase (see the module doc comment above `main()`).
+ */
+function resolveDownloadUrl(item: ApifyTikTokItem): string | null {
+  return (
+    item.videoMeta?.downloadAddr ??
+    item.videoMeta?.playAddr ??
+    item.downloadUrl ??
+    item.videoUrl ??
+    item.playUrl ??
+    null
+  )
 }
 
 function describeError(error: unknown): string {
@@ -123,6 +167,7 @@ async function main() {
   for (const item of items) {
     const title = deriveTitle(item)
     const thumbnailUrl = item.videoMeta?.coverUrl ?? item.videoMeta?.originalCoverUrl ?? null
+    const downloadUrl = resolveDownloadUrl(item)
     const views = item.playCount ?? 0
     const likes = item.diggCount ?? 0
     const shares = item.shareCount ?? 0
@@ -140,6 +185,13 @@ async function main() {
         image_url: thumbnailUrl,
         est_retail_price: 0,
         est_sourcing_cost: 0,
+        // Only sent when the actor actually provides a direct video URL —
+        // never sent as null/undefined, so this is a no-op against the
+        // current products table (which has no `download_url` column yet)
+        // until BOTH a downloader actor is in use AND that column exists.
+        // Add it with:
+        //   alter table public.products add column if not exists download_url text;
+        ...(downloadUrl ? { download_url: downloadUrl } : {}),
       }
 
       const { data: existing, error: lookupError } = await supabase

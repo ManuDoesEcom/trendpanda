@@ -6,7 +6,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { OpportunityBadgePill } from "@/components/products/opportunity-badge"
 import { SaveButton } from "@/components/products/save-button"
-import { DownloadVideoButton } from "@/components/products/download-video-button"
+import { DownloadMediaButton } from "@/components/products/download-media-button"
 import { formatCurrency, formatCompactNumber } from "@/lib/utils/financial"
 import { cn } from "cn"
 
@@ -41,13 +41,24 @@ export function ProductCard({ product, isSaved = false }: { product: Product; is
         )}
         <OpportunityBadgePill badge={product.opportunityBadge} score={product.opportunityScore} className="absolute top-2 left-2" />
         <div className="absolute top-2 right-2 flex gap-1.5">
-          {product.downloadableVideoUrl && (
-            <DownloadVideoButton
-              videoUrl={product.downloadableVideoUrl}
+          {product.downloadableVideoUrl ? (
+            <DownloadMediaButton
+              url={product.downloadableVideoUrl}
               filename={`${product.slug}.mp4`}
+              kind="video"
               variant="secondary"
               size="icon"
             />
+          ) : (
+            product.imageUrls[0] && (
+              <DownloadMediaButton
+                url={product.imageUrls[0]}
+                filename={`${product.slug}.jpg`}
+                kind="image"
+                variant="secondary"
+                size="icon"
+              />
+            )
           )}
           <SaveButton productId={product.id} initialSaved={isSaved} variant="secondary" size="icon" />
         </div>
