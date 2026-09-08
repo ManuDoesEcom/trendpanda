@@ -1,6 +1,6 @@
 import { MOCK_PRODUCTS } from "@/lib/mock-data"
 import { createClient } from "@/lib/supabase/server"
-import { pickSampleVideo } from "@/lib/utils/sample-media"
+import { getTikTokVideoId } from "@/lib/api/tiktok-video-lookup"
 import { scoreFromProduct } from "@/lib/utils/scoring"
 import type {
   AdFilters,
@@ -64,11 +64,12 @@ function mapTikTokMetrics(row: TikTokMetricsRow | null): TikTokMetrics {
   }
 }
 
-function mapProduct(row: ProductRow): Product {
+async function mapProduct(row: ProductRow): Promise<Product> {
   const tiktok = mapTikTokMetrics(row.tiktok_metrics)
   const metaAds: MetaAd[] = []
   const sellingPrice = Number(row.est_retail_price) || 0
   const sourcingCost = Number(row.est_sourcing_cost) || 0
+  const tiktokVideoId = await getTikTokVideoId(row.title)
 
   const { score, badge } = scoreFromProduct({
     sellingPrice,
@@ -85,12 +86,7 @@ function mapProduct(row: ProductRow): Product {
     description: row.description ?? "",
     category: row.category,
     imageUrls: row.image_url ? [row.image_url] : [],
-    // The TikTok CDN URL captured at import time is signed, expires within
-    // days, and is blocked from cross-origin <video> playback by TikTok's
-    // Referer check — it can never work as a direct <video src>. A stable
-    // sample clip is used as a working stand-in until a real, embeddable
-    // source is wired up.
-    videoUrl: pickSampleVideo(row.id),
+    tiktokVideoId,
     sellingPrice,
     sourcingCost,
     tiktok,
@@ -163,7 +159,7 @@ async function fetchAllProducts(): Promise<Product[]> {
     throw new Error(`Failed to load products from Supabase: ${error.message}`)
   }
 
-  return (data as unknown as ProductRow[]).map(mapProduct)
+  return Promise.all((data as unknown as ProductRow[]).map(mapProduct))
 }
 
 export async function getProducts(filters: ProductFilters = {}): Promise<Product[]> {
@@ -183,7 +179,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     throw new Error(`Failed to load product ${id} from Supabase: ${error.message}`)
   }
 
-  return data ? mapProduct(data as unknown as ProductRow) : null
+  return data ? await mapProduct(data as unknown as ProductRow) : null
 }
 
 export async function getProductCategories(): Promise<string[]> {

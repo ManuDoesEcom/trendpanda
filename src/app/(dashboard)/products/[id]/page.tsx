@@ -19,7 +19,7 @@ import { OpportunityBadgePill } from "@/components/products/opportunity-badge"
 import { SaveButton } from "@/components/products/save-button"
 import { FinancialCalculator } from "@/components/products/financial-calculator"
 import { TrendChart } from "@/components/products/trend-chart"
-import { TikTokVideoPlayer } from "@/components/products/tiktok-video-player"
+import { TikTokEmbed } from "@/components/products/tiktok-embed"
 import { AdCard } from "@/components/ads/ad-card"
 import { ProductCard } from "@/components/products/product-card"
 import { Badge } from "@/components/ui/badge"
@@ -81,12 +81,8 @@ export default async function ProductDetailPage({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-6">
-          {product.videoUrl ? (
-            <TikTokVideoPlayer
-              videoUrl={product.videoUrl}
-              posterUrl={product.imageUrls[0] ?? null}
-              title={product.title}
-            />
+          {product.tiktokVideoId ? (
+            <TikTokEmbed videoId={product.tiktokVideoId} title={product.title} lazy={false} />
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {product.imageUrls.length > 0 ? (

@@ -8,7 +8,7 @@ import type {
   TikTokMetrics,
 } from "@/lib/types"
 import { scoreFromProduct } from "@/lib/utils/scoring"
-import { SAMPLE_VIDEO_URLS, pickSampleVideo } from "@/lib/utils/sample-media"
+import { SAMPLE_VIDEO_URLS } from "@/lib/utils/sample-media"
 
 function seededRandom(seed: number) {
   let value = seed
@@ -506,7 +506,8 @@ function buildProduct(seed: ProductSeed): Product {
       `https://picsum.photos/seed/${seed.id}-2/800/800`,
       `https://picsum.photos/seed/${seed.id}-3/800/800`,
     ],
-    videoUrl: pickSampleVideo(seed.id),
+    // Hand-authored demo products have no real TikTok source video.
+    tiktokVideoId: null,
     sellingPrice: seed.sellingPrice,
     sourcingCost: seed.sourcingCost,
     tiktok,

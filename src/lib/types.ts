@@ -60,7 +60,7 @@ export interface Product {
   description: string
   category: string
   imageUrls: string[]
-  videoUrl: string | null
+  tiktokVideoId: string | null
   sellingPrice: number
   sourcingCost: number
   tiktok: TikTokMetrics
