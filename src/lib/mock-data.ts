@@ -93,6 +93,17 @@ const ADVERTISERS = [
 const CTAS: AdCallToAction[] = ["Shop Now", "Learn More", "Get Offer", "Buy Now", "Sign Up"]
 const ALL_PLATFORMS: AdPlatform[] = ["Facebook", "Instagram", "Messenger", "Audience Network"]
 
+// Real, playable sample clips (verified reachable). Mock ads marked as
+// "video" must point at an actual video file, not a still image — a
+// picsum.photos URL was previously reused here, which is why the <video>
+// element in AdCard never had anything to decode.
+const VIDEO_SAMPLE_URLS = [
+  "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+  "https://www.w3schools.com/html/mov_bbb.mp4",
+  "https://download.samplelib.com/mp4/sample-5s.mp4",
+  "https://download.samplelib.com/mp4/sample-10s.mp4",
+]
+
 function buildAds(
   productSeed: number,
   count: number,
@@ -108,6 +119,10 @@ function buildAds(
     const activeSinceDays = Math.round(3 + rand() * 62)
     const platformCount = 1 + Math.floor(rand() * 3)
     const shuffled = [...ALL_PLATFORMS].sort(() => rand() - 0.5)
+    const isVideo = i % 3 === 0
+    const mediaUrl = isVideo
+      ? VIDEO_SAMPLE_URLS[i % VIDEO_SAMPLE_URLS.length]
+      : `https://picsum.photos/seed/${mediaSeedPrefix}-ad-${i}/720/1280`
 
     ads.push({
       id: `${mediaSeedPrefix}-ad-${i + 1}`,
@@ -115,8 +130,8 @@ function buildAds(
       advertiserAvatarUrl: `https://i.pravatar.cc/150?u=${mediaSeedPrefix}-${i}`,
       adCopy: copies[i % copies.length],
       headline,
-      mediaUrl: `https://picsum.photos/seed/${mediaSeedPrefix}-ad-${i}/640/800`,
-      mediaType: i % 3 === 0 ? "video" : "image",
+      mediaUrl,
+      mediaType: isVideo ? "video" : "image",
       cta: CTAS[Math.floor(rand() * CTAS.length)],
       platforms: shuffled.slice(0, platformCount),
       activeSinceDays,

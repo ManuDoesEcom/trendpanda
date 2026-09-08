@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { Download, PlayCircle } from "lucide-react"
+import { Download } from "lucide-react"
 import type { MetaAd } from "@/lib/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -27,12 +27,21 @@ export function AdCard({ ad }: { ad: AdCardData }) {
 
   return (
     <Card className="overflow-hidden py-0">
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
-        <Image src={ad.mediaUrl} alt={ad.headline} fill sizes="(min-width: 768px) 320px, 90vw" className="object-cover" />
-        {ad.mediaType === "video" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <PlayCircle className="size-10 text-white/90" />
-          </div>
+      <div className="relative aspect-[9/16] w-full overflow-hidden bg-muted">
+        {ad.mediaType === "video" ? (
+          <video
+            src={ad.mediaUrl}
+            poster={`https://picsum.photos/seed/${ad.id}-poster/720/1280`}
+            autoPlay
+            muted
+            loop
+            playsInline
+            controls
+            preload="metadata"
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : (
+          <Image src={ad.mediaUrl} alt={ad.headline} fill sizes="(min-width: 768px) 320px, 90vw" className="object-cover" />
         )}
         <Badge
           variant={ad.isActive ? "default" : "outline"}
