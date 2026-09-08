@@ -78,9 +78,22 @@ export default async function TikTokExplorerPage({
                 <TableRow key={product.id}>
                   <TableCell>
                     <Link href={`/products/${product.id}`} className="flex items-center gap-3">
-                      <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                        {product.imageUrls[0] && (
-                          <Image src={product.imageUrls[0]} alt={product.title} fill sizes="40px" className="object-cover" />
+                      <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-md bg-muted">
+                        {product.videoUrl ? (
+                          <video
+                            src={product.videoUrl}
+                            poster={product.imageUrls[0] ?? undefined}
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                            preload="metadata"
+                            className="absolute inset-0 size-full object-cover"
+                          />
+                        ) : (
+                          product.imageUrls[0] && (
+                            <Image src={product.imageUrls[0]} alt={product.title} fill sizes="96px" className="object-cover" />
+                          )
                         )}
                       </div>
                       <div className="min-w-0">

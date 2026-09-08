@@ -15,8 +15,19 @@ export function ProductCard({ product, isSaved = false }: { product: Product; is
 
   return (
     <Card className="group/product-card overflow-hidden py-0">
-      <Link href={`/products/${product.id}`} className="relative block aspect-square overflow-hidden bg-muted">
-        {product.imageUrls[0] ? (
+      <Link href={`/products/${product.id}`} className="relative block aspect-video overflow-hidden bg-muted">
+        {product.videoUrl ? (
+          <video
+            src={product.videoUrl}
+            poster={product.imageUrls[0] ?? undefined}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover/product-card:scale-105"
+          />
+        ) : product.imageUrls[0] ? (
           <Image
             src={product.imageUrls[0]}
             alt={product.title}

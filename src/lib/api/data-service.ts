@@ -1,5 +1,6 @@
 import { MOCK_PRODUCTS } from "@/lib/mock-data"
 import { createClient } from "@/lib/supabase/server"
+import { pickSampleVideo } from "@/lib/utils/sample-media"
 import { scoreFromProduct } from "@/lib/utils/scoring"
 import type {
   AdFilters,
@@ -84,6 +85,12 @@ function mapProduct(row: ProductRow): Product {
     description: row.description ?? "",
     category: row.category,
     imageUrls: row.image_url ? [row.image_url] : [],
+    // The TikTok CDN URL captured at import time is signed, expires within
+    // days, and is blocked from cross-origin <video> playback by TikTok's
+    // Referer check — it can never work as a direct <video src>. A stable
+    // sample clip is used as a working stand-in until a real, embeddable
+    // source is wired up.
+    videoUrl: pickSampleVideo(row.id),
     sellingPrice,
     sourcingCost,
     tiktok,

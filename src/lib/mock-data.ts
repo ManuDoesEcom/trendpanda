@@ -8,6 +8,7 @@ import type {
   TikTokMetrics,
 } from "@/lib/types"
 import { scoreFromProduct } from "@/lib/utils/scoring"
+import { SAMPLE_VIDEO_URLS, pickSampleVideo } from "@/lib/utils/sample-media"
 
 function seededRandom(seed: number) {
   let value = seed
@@ -93,17 +94,6 @@ const ADVERTISERS = [
 const CTAS: AdCallToAction[] = ["Shop Now", "Learn More", "Get Offer", "Buy Now", "Sign Up"]
 const ALL_PLATFORMS: AdPlatform[] = ["Facebook", "Instagram", "Messenger", "Audience Network"]
 
-// Real, playable sample clips (verified reachable). Mock ads marked as
-// "video" must point at an actual video file, not a still image — a
-// picsum.photos URL was previously reused here, which is why the <video>
-// element in AdCard never had anything to decode.
-const VIDEO_SAMPLE_URLS = [
-  "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
-  "https://www.w3schools.com/html/mov_bbb.mp4",
-  "https://download.samplelib.com/mp4/sample-5s.mp4",
-  "https://download.samplelib.com/mp4/sample-10s.mp4",
-]
-
 function buildAds(
   productSeed: number,
   count: number,
@@ -121,7 +111,7 @@ function buildAds(
     const shuffled = [...ALL_PLATFORMS].sort(() => rand() - 0.5)
     const isVideo = i % 3 === 0
     const mediaUrl = isVideo
-      ? VIDEO_SAMPLE_URLS[i % VIDEO_SAMPLE_URLS.length]
+      ? SAMPLE_VIDEO_URLS[i % SAMPLE_VIDEO_URLS.length]
       : `https://picsum.photos/seed/${mediaSeedPrefix}-ad-${i}/720/1280`
 
     ads.push({
@@ -516,6 +506,7 @@ function buildProduct(seed: ProductSeed): Product {
       `https://picsum.photos/seed/${seed.id}-2/800/800`,
       `https://picsum.photos/seed/${seed.id}-3/800/800`,
     ],
+    videoUrl: pickSampleVideo(seed.id),
     sellingPrice: seed.sellingPrice,
     sourcingCost: seed.sourcingCost,
     tiktok,
