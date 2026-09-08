@@ -39,6 +39,7 @@ interface ProductRow {
   description: string | null
   category: string
   image_url: string | null
+  download_url: string | null
   est_retail_price: number | string | null
   est_sourcing_cost: number | string | null
   created_at: string
@@ -46,7 +47,7 @@ interface ProductRow {
 }
 
 const PRODUCT_SELECT = `
-  id, title, description, category, image_url, est_retail_price, est_sourcing_cost, created_at,
+  id, title, description, category, image_url, download_url, est_retail_price, est_sourcing_cost, created_at,
   tiktok_metrics ( total_views, total_likes, total_shares, total_comments, engagement_rate, growth_rate_30d, video_count, top_hashtags, daily_history )
 `
 
@@ -87,18 +88,12 @@ async function mapProduct(row: ProductRow): Promise<Product> {
     category: row.category,
     imageUrls: row.image_url ? [row.image_url] : [],
     tiktokVideoId,
-    // No real downloadable video file exists anywhere in this pipeline yet:
-    // not in `tiktok_metrics` (only view/like/share counters and hashtags —
-    // no video/play URL column), not in the current Apify dataset schema
-    // (checked: only a cover-image URL, no playAddr/downloadAddr/mp4 field),
-    // and not on TikTok's own public embed page (checked its HTML directly:
-    // no og:video, no .mp4 reference anywhere). scripts/import-apify.ts is
-    // already pre-wired to pick up and store a real one the moment a
-    // TikTok *downloader* Apify actor is used instead (see its module doc
-    // comment) — once `products.download_url` exists, add it to
-    // PRODUCT_SELECT/ProductRow above and read it here. Until then this
-    // stays null; the UI falls back to offering the cover image download.
-    downloadableVideoUrl: null,
+    // Real, directly downloadable TikTok CDN video URL, when the importing
+    // actor provided one (see scripts/import-apify.ts). It's a signed,
+    // time-limited TikTok CDN URL — valid for a period after the scrape,
+    // not permanently — so this goes stale and needs re-importing
+    // eventually. Falls back to the cover image in the UI when null.
+    downloadableVideoUrl: row.download_url ?? null,
     sellingPrice,
     sourcingCost,
     tiktok,

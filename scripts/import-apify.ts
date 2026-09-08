@@ -1,33 +1,35 @@
 /**
  * Imports a TikTok dataset scraped via Apify into Supabase.
  *
- * Reads the raw items from the given Apify dataset (produced by a
- * TikTok-scraper actor: fields like `text`, `videoMeta.coverUrl`,
- * `playCount`, `diggCount`, ...), maps each video into a `products` row
- * (title, thumbnail, category placeholder) plus a matching `tiktok_metrics`
- * row (views, likes, shares, comments, hashtags).
+ * Supports two Apify dataset shapes, auto-detected per item:
+ *  - "scraper" shape (the original actor): flat fields like `id`, `text`,
+ *    `videoMeta.coverUrl`, `playCount`, `diggCount`, `hashtags[]`. No real
+ *    downloadable video file — only a cover image.
+ *  - "raw aweme" shape (a TikTok *downloader* actor's raw API dump):
+ *    `aweme_id`, `desc`, `statistics.*`, `video.play_addr` /
+ *    `video.download_addr` / `video.download_no_watermark_addr`
+ *    (`url_list[0]` — a real, directly playable/downloadable TikTok CDN
+ *    video URL), `video.cover`. This is what makes `download_url` real.
+ *
+ * Each item is mapped into a `products` row (title, thumbnail, download
+ * URL, category placeholder) plus a matching `tiktok_metrics` row (views,
+ * likes, shares, comments, hashtags).
  *
  * The live `products` table in this project has its own shape — title,
- * description, category, image_url (singular), est_retail_price,
- * est_sourcing_cost, opportunity_score — and no unique business key, so
- * re-runs are made idempotent by matching on `title` (update if a product
- * with that title already exists, insert otherwise) rather than a DB-level
- * upsert.
+ * description, category, image_url (singular), download_url,
+ * est_retail_price, est_sourcing_cost, opportunity_score — and no unique
+ * business key, so re-runs are made idempotent by matching on `title`
+ * (skip if a product with that title already exists, insert otherwise)
+ * rather than a DB-level upsert.
  *
- * Direct video downloads: the current scraper actor's dataset has no
- * downloadable-video-file field at all (checked its full schema — only a
- * cover-image URL). `resolveDownloadUrl()` below is pre-wired to pick up a
- * real one (`videoMeta.downloadAddr`/`playAddr`, or a top-level
- * `downloadUrl`/`videoUrl`/`playUrl`) the moment the Apify actor is swapped
- * for a TikTok *downloader* actor that provides one — no other change to
- * this script is needed. Two things still have to happen once that data
- * exists: run `alter table public.products add column if not exists
- * download_url text;` in Supabase, and update `mapProduct()` in
- * lib/api/data-service.ts to select and pass through that column (it's not
- * read there yet, since the column doesn't exist today).
+ * Note on `download_url`: it's a signed, time-limited TikTok CDN URL —
+ * valid for a period after the scrape (matching the `x-expires` query
+ * param on the URL itself), not permanently. Re-run the import against a
+ * fresh dataset to refresh it once it expires.
  *
  * Usage:
- *   npx tsx scripts/import-apify.ts
+ *   npx tsx scripts/import-apify.ts [datasetId]
+ *   (datasetId defaults to DEFAULT_DATASET_ID below when omitted)
  *
  * Required environment variables (read from .env.local):
  *   NEXT_PUBLIC_SUPABASE_URL   — Supabase project URL
@@ -41,61 +43,122 @@ import { createClient } from "@supabase/supabase-js"
 
 loadEnv({ path: ".env.local" })
 
-const DATASET_ID = "olci8VJM6aYHAzx7U"
+const DEFAULT_DATASET_ID = "olci8VJM6aYHAzx7U"
 
-interface ApifyHashtag {
-  name?: string
+interface NormalizedItem {
+  id: string
+  text: string
+  createdAtISO: string | null
+  thumbnailUrl: string | null
+  downloadUrl: string | null
+  views: number
+  likes: number
+  shares: number
+  comments: number
+  hashtags: string[]
 }
 
-interface ApifyVideoMeta {
-  coverUrl?: string
-  originalCoverUrl?: string
-  // Not present in the current scraper actor's output (verified against
-  // its full dataset schema) — these are the field names most TikTok
-  // *downloader* actors use for a direct, playable/downloadable video
-  // file. Kept optional so this script does nothing today but picks them
-  // up automatically the moment a downloader actor is swapped in. Field
-  // names vary by actor; if the new actor uses a different key, add it
-  // here alongside the existing candidates.
-  downloadAddr?: string
-  playAddr?: string
-}
+// ---- "scraper" shape (original actor) --------------------------------
 
-interface ApifyTikTokItem {
-  id?: string
+interface ScraperItem {
+  id: string
   text?: string
-  webVideoUrl?: string
-  videoMeta?: ApifyVideoMeta
+  videoMeta?: { coverUrl?: string; originalCoverUrl?: string }
   diggCount?: number
   shareCount?: number
   playCount?: number
   commentCount?: number
-  hashtags?: ApifyHashtag[]
+  hashtags?: { name?: string }[]
   createTimeISO?: string
-  // Top-level candidates some downloader actors use instead of nesting
-  // under videoMeta.
-  downloadUrl?: string
-  videoUrl?: string
-  playUrl?: string
 }
 
-/**
- * Picks the first present direct video URL from whichever field name the
- * configured actor happens to use. Returns null for the current scraper
- * actor (none of these fields exist in its output) — `products.download_url`
- * is only written when this resolves to a real value AND that column has
- * been added to Supabase (see the module doc comment above `main()`).
- */
-function resolveDownloadUrl(item: ApifyTikTokItem): string | null {
-  return (
-    item.videoMeta?.downloadAddr ??
-    item.videoMeta?.playAddr ??
-    item.downloadUrl ??
-    item.videoUrl ??
-    item.playUrl ??
-    null
-  )
+function normalizeScraperItem(item: ScraperItem): NormalizedItem {
+  const hashtags = (item.hashtags ?? [])
+    .map((tag) => (tag.name ? `#${tag.name}` : null))
+    .filter((tag): tag is string => Boolean(tag))
+
+  return {
+    id: item.id,
+    text: item.text ?? "",
+    createdAtISO: item.createTimeISO ?? null,
+    thumbnailUrl: item.videoMeta?.coverUrl ?? item.videoMeta?.originalCoverUrl ?? null,
+    downloadUrl: null, // this actor never provides a real video file
+    views: item.playCount ?? 0,
+    likes: item.diggCount ?? 0,
+    shares: item.shareCount ?? 0,
+    comments: item.commentCount ?? 0,
+    hashtags,
+  }
 }
+
+// ---- "raw aweme" shape (TikTok downloader actor) ----------------------
+
+interface AwemeAddr {
+  url_list?: string[]
+}
+
+interface AwemeItem {
+  aweme_id: string
+  desc?: string
+  create_time?: number
+  statistics?: {
+    play_count?: number
+    digg_count?: number
+    share_count?: number
+    comment_count?: number
+  }
+  video?: {
+    cover?: AwemeAddr
+    origin_cover?: AwemeAddr
+    dynamic_cover?: AwemeAddr
+    download_no_watermark_addr?: AwemeAddr
+    download_addr?: AwemeAddr
+    play_addr?: AwemeAddr
+  }
+}
+
+function normalizeAwemeItem(item: AwemeItem): NormalizedItem {
+  const video = item.video ?? {}
+  const stats = item.statistics ?? {}
+  const text = item.desc ?? ""
+  const hashtags = [...text.matchAll(/#(\w+)/g)].map((match) => `#${match[1]}`)
+  const downloadUrl =
+    video.download_no_watermark_addr?.url_list?.[0] ??
+    video.download_addr?.url_list?.[0] ??
+    video.play_addr?.url_list?.[0] ??
+    null
+  const thumbnailUrl =
+    video.cover?.url_list?.[0] ??
+    video.origin_cover?.url_list?.[0] ??
+    video.dynamic_cover?.url_list?.[0] ??
+    null
+
+  return {
+    id: item.aweme_id,
+    text,
+    createdAtISO: item.create_time ? new Date(item.create_time * 1000).toISOString() : null,
+    thumbnailUrl,
+    downloadUrl,
+    views: stats.play_count ?? 0,
+    likes: stats.digg_count ?? 0,
+    shares: stats.share_count ?? 0,
+    comments: stats.comment_count ?? 0,
+    hashtags,
+  }
+}
+
+function normalizeItem(raw: unknown): NormalizedItem | null {
+  const item = raw as Record<string, unknown>
+  if (typeof item.aweme_id === "string" && item.video) {
+    return normalizeAwemeItem(item as unknown as AwemeItem)
+  }
+  if (typeof item.id === "string") {
+    return normalizeScraperItem(item as unknown as ScraperItem)
+  }
+  return null
+}
+
+// ---- shared helpers -----------------------------------------------------
 
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -126,17 +189,17 @@ function resolveApifyToken(raw: string): string {
   return raw
 }
 
-function deriveTitle(item: ApifyTikTokItem): string {
-  const withoutHashtags = (item.text ?? "").replace(/#[^\s#]+/g, "").trim()
+function deriveTitle(item: NormalizedItem): string {
+  const withoutHashtags = item.text.replace(/#[^\s#]+/g, "").trim()
   const cleaned = withoutHashtags.replace(/\s+/g, " ")
   if (cleaned.length > 0) {
     return cleaned.length > 120 ? `${cleaned.slice(0, 117)}...` : cleaned
   }
-  return `TikTok video ${item.id ?? "unknown"}`
+  return `TikTok video ${item.id}`
 }
 
-async function fetchDatasetItems(token: string): Promise<ApifyTikTokItem[]> {
-  const url = `https://api.apify.com/v2/datasets/${DATASET_ID}/items?token=${token}&clean=true&format=json`
+async function fetchDatasetItems(datasetId: string, token: string): Promise<unknown[]> {
+  const url = `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&clean=true&format=json`
   const response = await fetch(url)
 
   if (!response.ok) {
@@ -144,10 +207,11 @@ async function fetchDatasetItems(token: string): Promise<ApifyTikTokItem[]> {
     throw new Error(`Apify request failed (${response.status}): ${body}`)
   }
 
-  return (await response.json()) as ApifyTikTokItem[]
+  return (await response.json()) as unknown[]
 }
 
 async function main() {
+  const datasetId = process.argv[2] || DEFAULT_DATASET_ID
   const supabaseUrl = requireEnv("NEXT_PUBLIC_SUPABASE_URL")
   const serviceRoleKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY")
   const apifyToken = resolveApifyToken(requireEnv("APIFY_API_TOKEN"))
@@ -156,42 +220,38 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  console.log(`Fetching dataset ${DATASET_ID} from Apify...`)
-  const items = await fetchDatasetItems(apifyToken)
-  console.log(`Fetched ${items.length} items.`)
+  console.log(`Fetching dataset ${datasetId} from Apify...`)
+  const rawItems = await fetchDatasetItems(datasetId, apifyToken)
+  console.log(`Fetched ${rawItems.length} items.`)
 
   let imported = 0
   let skipped = 0
   let failed = 0
+  let unrecognized = 0
 
-  for (const item of items) {
+  for (const raw of rawItems) {
+    const item = normalizeItem(raw)
+    if (!item) {
+      unrecognized += 1
+      console.error("  ✗ Unrecognized item shape (no id/aweme_id) — skipped.")
+      continue
+    }
+
     const title = deriveTitle(item)
-    const thumbnailUrl = item.videoMeta?.coverUrl ?? item.videoMeta?.originalCoverUrl ?? null
-    const downloadUrl = resolveDownloadUrl(item)
-    const views = item.playCount ?? 0
-    const likes = item.diggCount ?? 0
-    const shares = item.shareCount ?? 0
-    const comments = item.commentCount ?? 0
-    const hashtags = (item.hashtags ?? [])
-      .map((tag) => (tag.name ? `#${tag.name}` : null))
-      .filter((tag): tag is string => Boolean(tag))
-    const engagementRate = views > 0 ? Number((((likes + shares + comments) / views) * 100).toFixed(2)) : 0
+    const engagementRate =
+      item.views > 0
+        ? Number((((item.likes + item.shares + item.comments) / item.views) * 100).toFixed(2))
+        : 0
 
     try {
       const productRow = {
         title,
         description: "",
         category: "TikTok Import",
-        image_url: thumbnailUrl,
+        image_url: item.thumbnailUrl,
         est_retail_price: 0,
         est_sourcing_cost: 0,
-        // Only sent when the actor actually provides a direct video URL —
-        // never sent as null/undefined, so this is a no-op against the
-        // current products table (which has no `download_url` column yet)
-        // until BOTH a downloader actor is in use AND that column exists.
-        // Add it with:
-        //   alter table public.products add column if not exists download_url text;
-        ...(downloadUrl ? { download_url: downloadUrl } : {}),
+        download_url: item.downloadUrl,
       }
 
       const { data: existing, error: lookupError } = await supabase
@@ -223,16 +283,16 @@ async function main() {
       const { error: metricsError } = await supabase.from("tiktok_metrics").upsert(
         {
           product_id: productId,
-          total_views: views,
-          total_likes: likes,
-          total_shares: shares,
-          total_comments: comments,
+          total_views: item.views,
+          total_likes: item.likes,
+          total_shares: item.shares,
+          total_comments: item.comments,
           engagement_rate: engagementRate,
           growth_rate_30d: 0,
           video_count: 1,
-          top_hashtags: hashtags,
-          daily_history: item.createTimeISO
-            ? [{ date: item.createTimeISO.slice(0, 10), tiktokViews: views, metaActiveAds: 0 }]
+          top_hashtags: item.hashtags,
+          daily_history: item.createdAtISO
+            ? [{ date: item.createdAtISO.slice(0, 10), tiktokViews: item.views, metaActiveAds: 0 }]
             : [],
         },
         { onConflict: "product_id" }
@@ -243,15 +303,19 @@ async function main() {
       }
 
       imported += 1
-      console.log(`  ✓ ${title.slice(0, 60)}`)
+      console.log(`  ✓ ${title.slice(0, 60)}${item.downloadUrl ? " [+video]" : ""}`)
     } catch (error) {
       failed += 1
       console.error(`  ✗ ${title.slice(0, 60)} — ${describeError(error)}`)
     }
   }
 
-  console.log(`\nDone. Imported ${imported} product(s), ${skipped} skipped (already imported), ${failed} failed.`)
-  if (failed > 0) {
+  console.log(
+    `\nDone. Imported ${imported} product(s), ${skipped} skipped (already imported), ${failed} failed` +
+      (unrecognized > 0 ? `, ${unrecognized} unrecognized item shape` : "") +
+      "."
+  )
+  if (failed > 0 || unrecognized > 0) {
     process.exitCode = 1
   }
 }

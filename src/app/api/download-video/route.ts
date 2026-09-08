@@ -16,9 +16,17 @@ const ALLOWED_HOSTS = new Set([
   "download.samplelib.com",
 ])
 
-// Cover-image CDN hosts (thumbnail download fallback), matching the
-// next.config.ts image remotePatterns for the same domains.
-const ALLOWED_HOST_SUFFIXES = [".tiktokcdn-us.com", ".tiktokcdn-eu.com", ".tiktokcdn.com"]
+// TikTok CDN hosts: cover-image download fallback (matching the
+// next.config.ts image remotePatterns for the same domains) plus the
+// video-file CDN (`v16m`/`v19.tiktokcdn-*`) and the alternate
+// api-style play-address host TikTok's raw API sometimes returns instead.
+const ALLOWED_HOST_SUFFIXES = [
+  ".tiktokcdn-us.com",
+  ".tiktokcdn-eu.com",
+  ".tiktokcdn.com",
+  ".tiktokv.us",
+  ".tiktokv.com",
+]
 
 function isHostAllowed(hostname: string): boolean {
   return ALLOWED_HOSTS.has(hostname) || ALLOWED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
