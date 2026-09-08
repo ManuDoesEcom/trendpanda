@@ -19,7 +19,7 @@ import { OpportunityBadgePill } from "@/components/products/opportunity-badge"
 import { SaveButton } from "@/components/products/save-button"
 import { FinancialCalculator } from "@/components/products/financial-calculator"
 import { TrendChart } from "@/components/products/trend-chart"
-import { TikTokEmbed } from "@/components/products/tiktok-embed"
+import { TikTokVideoPlayer } from "@/components/products/tiktok-video-player"
 import { DownloadMediaButton } from "@/components/products/download-media-button"
 import { AdCard } from "@/components/ads/ad-card"
 import { ProductCard } from "@/components/products/product-card"
@@ -82,28 +82,32 @@ export default async function ProductDetailPage({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex flex-col gap-6">
-          {product.tiktokVideoId ? (
-            <TikTokEmbed videoId={product.tiktokVideoId} title={product.title} lazy={false} />
+          {product.downloadableVideoUrl ? (
+            <TikTokVideoPlayer
+              videoUrl={product.downloadableVideoUrl}
+              posterUrl={product.imageUrls[0] ?? null}
+              title={product.title}
+            />
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {product.imageUrls.length > 0 ? (
                 product.imageUrls.map((url, index) => (
                   <div
                     key={url}
-                    className={`relative aspect-video overflow-hidden rounded-lg bg-muted ${index === 0 ? "col-span-3" : ""}`}
+                    className={`relative aspect-video overflow-hidden rounded-lg bg-black ${index === 0 ? "col-span-3" : ""}`}
                   >
                     <Image
                       src={url}
                       alt={`${product.title} image ${index + 1}`}
                       fill
                       sizes={index === 0 ? "(min-width: 1024px) 720px, 100vw" : "(min-width: 1024px) 240px, 45vw"}
-                      className="object-cover"
+                      className="object-contain"
                       priority={index === 0}
                     />
                   </div>
                 ))
               ) : (
-                <div className="col-span-3 flex aspect-video items-center justify-center rounded-lg bg-muted">
+                <div className="col-span-3 flex aspect-video items-center justify-center rounded-lg bg-black">
                   <ImageOff className="size-8 text-muted-foreground" />
                 </div>
               )}

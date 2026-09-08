@@ -15,16 +15,19 @@ export function ProductCard({ product, isSaved = false }: { product: Product; is
   const activeAds = product.metaAds.filter((ad) => ad.isActive).length
 
   return (
-    <Card className="group/product-card overflow-hidden py-0">
-      <Link href={`/products/${product.id}`} className="relative block aspect-video overflow-hidden bg-muted">
-        {product.tiktokVideoId ? (
-          <iframe
-            src={`https://www.tiktok.com/embed/v2/${product.tiktokVideoId}`}
-            title={product.title}
-            allow="autoplay; encrypted-media; fullscreen"
-            allowFullScreen
-            loading="lazy"
-            className="absolute inset-0 size-full border-0 object-cover"
+    <Card className="overflow-hidden py-0">
+      <Link href={`/products/${product.id}`} className="relative block aspect-video overflow-hidden bg-black">
+        {product.downloadableVideoUrl ? (
+          <video
+            src={product.downloadableVideoUrl}
+            poster={product.imageUrls[0] ?? undefined}
+            controls
+            muted
+            autoPlay
+            loop
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 size-full bg-black object-contain"
           />
         ) : product.imageUrls[0] ? (
           <Image
@@ -32,7 +35,7 @@ export function ProductCard({ product, isSaved = false }: { product: Product; is
             alt={product.title}
             fill
             sizes="(min-width: 1280px) 22vw, (min-width: 768px) 33vw, 90vw"
-            className="object-cover transition-transform duration-300 group-hover/product-card:scale-105"
+            className="object-contain"
           />
         ) : (
           <div className="flex size-full items-center justify-center">

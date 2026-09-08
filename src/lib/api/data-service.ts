@@ -1,6 +1,5 @@
 import { MOCK_PRODUCTS } from "@/lib/mock-data"
 import { createClient } from "@/lib/supabase/server"
-import { getTikTokVideoId } from "@/lib/api/tiktok-video-lookup"
 import { scoreFromProduct } from "@/lib/utils/scoring"
 import type {
   AdFilters,
@@ -65,12 +64,11 @@ function mapTikTokMetrics(row: TikTokMetricsRow | null): TikTokMetrics {
   }
 }
 
-async function mapProduct(row: ProductRow): Promise<Product> {
+function mapProduct(row: ProductRow): Product {
   const tiktok = mapTikTokMetrics(row.tiktok_metrics)
   const metaAds: MetaAd[] = []
   const sellingPrice = Number(row.est_retail_price) || 0
   const sourcingCost = Number(row.est_sourcing_cost) || 0
-  const tiktokVideoId = await getTikTokVideoId(row.title)
 
   const { score, badge } = scoreFromProduct({
     sellingPrice,
@@ -87,7 +85,6 @@ async function mapProduct(row: ProductRow): Promise<Product> {
     description: row.description ?? "",
     category: row.category,
     imageUrls: row.image_url ? [row.image_url] : [],
-    tiktokVideoId,
     // Real, directly downloadable TikTok CDN video URL, when the importing
     // actor provided one (see scripts/import-apify.ts). It's a signed,
     // time-limited TikTok CDN URL — valid for a period after the scrape,
@@ -166,7 +163,7 @@ async function fetchAllProducts(): Promise<Product[]> {
     throw new Error(`Failed to load products from Supabase: ${error.message}`)
   }
 
-  return Promise.all((data as unknown as ProductRow[]).map(mapProduct))
+  return (data as unknown as ProductRow[]).map(mapProduct)
 }
 
 export async function getProducts(filters: ProductFilters = {}): Promise<Product[]> {
@@ -186,7 +183,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     throw new Error(`Failed to load product ${id} from Supabase: ${error.message}`)
   }
 
-  return data ? await mapProduct(data as unknown as ProductRow) : null
+  return data ? mapProduct(data as unknown as ProductRow) : null
 }
 
 export async function getProductCategories(): Promise<string[]> {

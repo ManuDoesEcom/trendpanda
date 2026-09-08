@@ -507,7 +507,6 @@ function buildProduct(seed: ProductSeed): Product {
       `https://picsum.photos/seed/${seed.id}-3/800/800`,
     ],
     // Hand-authored demo products have no real TikTok source video.
-    tiktokVideoId: null,
     downloadableVideoUrl: null,
     sellingPrice: seed.sellingPrice,
     sourcingCost: seed.sourcingCost,

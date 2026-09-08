@@ -60,10 +60,9 @@ export interface Product {
   description: string
   category: string
   imageUrls: string[]
-  tiktokVideoId: string | null
-  // A directly downloadable video file for this product, if one exists.
-  // Always null for TikTok-sourced products today — see the comment on
-  // `mapProduct` in lib/api/data-service.ts for why.
+  // A directly downloadable TikTok CDN video file, when the importing
+  // Apify actor provided one (see scripts/import-apify.ts) — null
+  // otherwise, in which case the UI falls back to the cover image.
   downloadableVideoUrl: string | null
   sellingPrice: number
   sourcingCost: number
