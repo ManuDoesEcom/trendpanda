@@ -61,6 +61,10 @@ export interface Product {
   category: string
   imageUrls: string[]
   tiktokVideoId: string | null
+  // A directly downloadable video file for this product, if one exists.
+  // Always null for TikTok-sourced products today — see the comment on
+  // `mapProduct` in lib/api/data-service.ts for why.
+  downloadableVideoUrl: string | null
   sellingPrice: number
   sourcingCost: number
   tiktok: TikTokMetrics

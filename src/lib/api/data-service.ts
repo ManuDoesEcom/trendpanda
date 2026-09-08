@@ -87,6 +87,15 @@ async function mapProduct(row: ProductRow): Promise<Product> {
     category: row.category,
     imageUrls: row.image_url ? [row.image_url] : [],
     tiktokVideoId,
+    // No real downloadable video file exists anywhere in this pipeline:
+    // not in `tiktok_metrics` (only view/like/share counters and hashtags —
+    // no video/play URL column), not in the original Apify dataset schema
+    // (checked: only a cover-image URL, no playAddr/downloadAddr/mp4 field),
+    // and not on TikTok's own public embed page (checked its HTML directly:
+    // no og:video, no .mp4 reference anywhere). TikTok simply doesn't expose
+    // one publicly. This stays null until a real source is wired in; the
+    // download button (DownloadVideoButton) only renders when it's set.
+    downloadableVideoUrl: null,
     sellingPrice,
     sourcingCost,
     tiktok,

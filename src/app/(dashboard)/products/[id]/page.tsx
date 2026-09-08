@@ -20,6 +20,7 @@ import { SaveButton } from "@/components/products/save-button"
 import { FinancialCalculator } from "@/components/products/financial-calculator"
 import { TrendChart } from "@/components/products/trend-chart"
 import { TikTokEmbed } from "@/components/products/tiktok-embed"
+import { DownloadVideoButton } from "@/components/products/download-video-button"
 import { AdCard } from "@/components/ads/ad-card"
 import { ProductCard } from "@/components/products/product-card"
 import { Badge } from "@/components/ui/badge"
@@ -89,7 +90,7 @@ export default async function ProductDetailPage({
                 product.imageUrls.map((url, index) => (
                   <div
                     key={url}
-                    className={`relative overflow-hidden rounded-lg bg-muted ${index === 0 ? "col-span-3 aspect-video" : "aspect-square"}`}
+                    className={`relative aspect-video overflow-hidden rounded-lg bg-muted ${index === 0 ? "col-span-3" : ""}`}
                   >
                     <Image
                       src={url}
@@ -106,6 +107,15 @@ export default async function ProductDetailPage({
                   <ImageOff className="size-8 text-muted-foreground" />
                 </div>
               )}
+            </div>
+          )}
+
+          {product.downloadableVideoUrl && (
+            <div className="flex justify-end">
+              <DownloadVideoButton
+                videoUrl={product.downloadableVideoUrl}
+                filename={`${product.slug}.mp4`}
+              />
             </div>
           )}
 

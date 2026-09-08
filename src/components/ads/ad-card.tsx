@@ -1,9 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Download } from "lucide-react"
+import { Download, Loader2 } from "lucide-react"
 import type { MetaAd } from "@/lib/types"
+import { downloadFile } from "@/lib/utils/download-file"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,8 +23,16 @@ const SPEND_TONE: Record<MetaAd["estimatedSpend"], string> = {
 }
 
 export function AdCard({ ad }: { ad: AdCardData }) {
-  function handleDownload() {
-    window.open(ad.mediaUrl, "_blank", "noopener,noreferrer")
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  async function handleDownload() {
+    setIsDownloading(true)
+    try {
+      const extension = ad.mediaType === "video" ? "mp4" : "jpg"
+      await downloadFile(ad.mediaUrl, `${ad.id}.${extension}`)
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   return (
@@ -83,8 +93,8 @@ export function AdCard({ ad }: { ad: AdCardData }) {
 
       <CardFooter className="flex items-center justify-between gap-2">
         <span className={`text-xs font-medium ${SPEND_TONE[ad.estimatedSpend]}`}>{ad.estimatedSpend} spend</span>
-        <Button size="sm" variant="outline" onClick={handleDownload}>
-          <Download />
+        <Button size="sm" variant="outline" onClick={handleDownload} disabled={isDownloading}>
+          {isDownloading ? <Loader2 className="animate-spin" /> : <Download />}
           Download Creative
         </Button>
       </CardFooter>

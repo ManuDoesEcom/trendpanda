@@ -508,6 +508,7 @@ function buildProduct(seed: ProductSeed): Product {
     ],
     // Hand-authored demo products have no real TikTok source video.
     tiktokVideoId: null,
+    downloadableVideoUrl: null,
     sellingPrice: seed.sellingPrice,
     sourcingCost: seed.sourcingCost,
     tiktok,
